@@ -56,6 +56,11 @@ def handle_client(client_socket, client_address):
                 # Dosya listesini güncelle
                 broadcast_file_list()
 
+            elif header.startswith("LIST"):
+                # Dosya listesini istemciye gönder
+                file_list = "\n".join(files) if files else "Sunucuda dosya yok."
+                client_socket.send(f"LIST:{file_list}".encode())
+
             elif header.startswith("DOWNLOAD:"):
                 requested_file = header[9:]
                 requested_path = os.path.join(FILES_DIR, requested_file)
@@ -75,6 +80,7 @@ def handle_client(client_socket, client_address):
             log_message(f"{clients[client_socket]} bağlantıyı kesti.")
             del clients[client_socket]
         client_socket.close()
+
 
 def log_message(message):
     """Log mesajlarını GUI'ye ekler."""

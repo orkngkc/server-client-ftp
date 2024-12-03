@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 def receive_messages():
+    """Sunucudan gelen mesajları dinler ve ekranda gösterir."""
     while True:
         try:
             message = client_socket.recv(1024).decode()
@@ -25,6 +26,7 @@ def receive_messages():
             log_message(f"Hata: {e}")
             break
 
+
 def send_file():
     file_path = filedialog.askopenfilename(filetypes=[("Tüm Dosyalar", "*.*")])
     if not file_path:
@@ -41,7 +43,11 @@ def send_file():
         log_message(f"Hata: {e}")
 
 def request_file_list():
-    client_socket.send("LIST".encode())
+    """Dosya listesini sunucudan talep eder."""
+    try:
+        client_socket.send("LIST".encode())
+    except Exception as e:
+        log_message(f"Hata: {e}")
 
 def download_file():
     file_name = file_name_entry.get()
