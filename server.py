@@ -12,6 +12,13 @@ FILES_DIR = "server_files"
 if not os.path.exists(FILES_DIR):
     os.makedirs(FILES_DIR)
 
+def load_existing_files():
+    """server_files klasöründeki mevcut dosyaları yükler."""
+    global files
+    files = os.listdir(FILES_DIR)
+    log_message("server_files klasöründeki dosyalar yüklendi.")
+    log_message(f"Yüklü dosyalar: {', '.join(files) if files else 'Hiç dosya yok.'}")
+
 def broadcast_file_list():
     """Tüm istemcilere güncellenmiş dosya listesini gönderir."""
     file_list = "\n".join(files) if files else "Sunucuda dosya yok."
@@ -57,7 +64,7 @@ def handle_client(client_socket, client_address):
                 broadcast_file_list()
 
             elif header.startswith("LIST"):
-                # Dosya listesini istemciye gönder
+                log_message(f"{username} dosya listesini talep etti.")
                 file_list = "\n".join(files) if files else "Sunucuda dosya yok."
                 client_socket.send(f"LIST:{file_list}".encode())
 
@@ -81,7 +88,6 @@ def handle_client(client_socket, client_address):
             del clients[client_socket]
         client_socket.close()
 
-
 def log_message(message):
     """Log mesajlarını GUI'ye ekler."""
     log_area.insert(tk.END, f"{message}\n")
@@ -92,6 +98,8 @@ def start_server_thread():
 
 def start_server():
     """Sunucuyu başlatır."""
+    load_existing_files()  # Mevcut dosyaları yükle
+
     host = "0.0.0.0"
     port = int(port_entry.get())
 
