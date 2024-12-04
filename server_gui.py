@@ -14,11 +14,22 @@ if not os.path.exists(FILES_DIR):
     os.makedirs(FILES_DIR)
 
 def load_existing_files():
-    """Loads existing files from the selected storage directory."""
-    global files
+    """Loads existing files from the selected storage directory and assigns ownership."""
+    global files, file_owners
     files = os.listdir(FILES_DIR)
+    file_owners.clear()  # Clear existing ownership data
+
+    for file_name in files:
+        # Extract ownership from file name if the naming convention includes ownership
+        if "_" in file_name:
+            owner, actual_file_name = file_name.split("_", 1)  # Split into owner and file name
+            file_owners[file_name] = owner  # Assign ownership
+        else:
+            log_message(f"Warning: No ownership information found for file: {file_name}")
+    
     log_message("Files loaded from the storage directory.")
     log_message(f"Loaded files: {', '.join(files) if files else 'No files found.'}")
+
 
 def broadcast_file_list():
     """Sends the updated file list to all clients."""
