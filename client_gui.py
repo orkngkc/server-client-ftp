@@ -1,77 +1,129 @@
 import socket
 import threading
-from tkinter import Tk, Label, Entry, Button, Text, Scrollbar, END
-def receive_messages(client_socket, text_area):
-    """Listen for messages from the server."""
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+def receive_messages():
+    """Sunucudan gelen mesajları dinler ve ekranda gösterir."""
     while True:
         try:
             message = client_socket.recv(1024).decode()
-            if message:
-                text_area.insert(END, f"{message}\n")
-                text_area.see(END)  # Auto-scroll to the latest message
+            if message.startswith("LIST:"):
+                file_list = message[5:]
+                log_message(f"Dosya Listesi:\n{file_list}")
+            elif message.startswith("FILE:"):
+                file_name = message[5:]
+                file_data = client_socket.recv(1024 * 64)
+
+                with open(file_name, "wb") as f:
+                    f.write(file_data)
+                log_message(f"Dosya indirildi: {file_name}")
+            elif message.startswith("ERROR:"):
+                log_message(message)
+            else:
+                log_message(f"Sunucudan: {message}")
         except Exception as e:
-            text_area.insert(END, f"Disconnected from server: {e}\n")
-            text_area.see(END)
+            log_message(f"Hata: {e}")
             break
 
-
-def send_message(client_socket, message_entry, text_area):
-    """Send a message to the server."""
-    message = message_entry.get().strip()
-    if message:
+def delete_file():
+    file_name = delete_file_name_entry.get()
+    if file_name:
         try:
-            client_socket.send(message.encode())
-            message_entry.delete(0, END)
-        except:
-            text_area.insert(END, "Error sending message. Disconnected from server.\n")
-            text_area.see(END)
+            client_socket.send(f"DELETE:{file_name}".encode())
+            log_message(f"Silme talebi gönderildi: {file_name}")
+        except Exception as e:
+            log_message(f"Hata: {e}")
+    else:
+        messagebox.showerror("Hata", "Silmek için bir dosya adı girin.")
 
-def connect_to_server(ip, port, name, text_area, message_entry):
-    """Connect to the server and start message handling."""
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+def send_file():
+    file_path = filedialog.askopenfilename(filetypes=[("Tüm Dosyalar", "*.*")])
+    if not file_path:
+        return
+
     try:
-        client_socket.connect((ip, int(port)))
-        text_area.insert(END, f"Connected to server at {ip}:{port}\n")
-        client_socket.send(name.encode())
+        file_name = file_path.split("/")[-1]
+        client_socket.send(f"FILE:{file_name}".encode())
 
-        threading.Thread(target=receive_messages, args=(client_socket, text_area), daemon=True).start()
-
-        send_button.config(command=lambda: send_message(client_socket, message_entry, text_area))
-        send_button.pack()
+        with open(file_path, "rb") as f:
+            client_socket.send(f.read())
+        log_message(f"Dosya gönderildi: {file_name}")
     except Exception as e:
-        text_area.insert(END, f"Error connecting to server: {e}\n")
-        text_area.see(END)
+        log_message(f"Hata: {e}")
 
-# GUI setup
-root = Tk()
-root.title("Client GUI")
+def request_file_list():
+    """Dosya listesini sunucudan talep eder."""
+    try:
+        client_socket.send("LIST".encode())
+    except Exception as e:
+        log_message(f"Hata: {e}")
 
-Label(root, text="Server IP:").pack()
-ip_entry = Entry(root)
-ip_entry.pack()
+def download_file():
+    file_name = file_name_entry.get()
+    if file_name:
+        client_socket.send(f"DOWNLOAD:{file_name}".encode())
+    else:
+        messagebox.showerror("Hata", "İndirmek için bir dosya adı girin.")
 
-Label(root, text="Port:").pack()
-port_entry = Entry(root)
-port_entry.pack()
+def connect_to_server():
+    global client_socket
+    try:
+        server_ip = server_ip_entry.get()
+        server_port = int(server_port_entry.get())
+        username = username_entry.get()
 
-Label(root, text="Name:").pack()
-name_entry = Entry(root)
-name_entry.pack()
+        if not username:
+            messagebox.showerror("Hata", "Kullanıcı adı boş olamaz!")
+            return
 
-connect_button = Button(root, text="Connect", command=lambda: connect_to_server(
-    ip_entry.get(), port_entry.get(), name_entry.get(), text_area, message_entry))
-connect_button.pack()
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((server_ip, server_port))
+        client_socket.send(username.encode())
 
-text_area = Text(root, height=20, width=50)
-text_area.pack()
+        threading.Thread(target=receive_messages, daemon=True).start()
+        log_message("Sunucuya bağlanıldı.")
+    except Exception as e:
+        messagebox.showerror("Hata", f"Bağlanılamadı: {e}")
 
-scrollbar = Scrollbar(root, command=text_area.yview)
-text_area.config(yscrollcommand=scrollbar.set)
-scrollbar.pack(side="right", fill="y")
+def log_message(message):
+    chat_area.insert(tk.END, f"{message}\n")
+    chat_area.yview(tk.END)
 
-message_entry = Entry(root, width=40)
-message_entry.pack()
+# GUI
+app = tk.Tk()
+app.title("Dosya İstemcisi")
 
-send_button = Button(root, text="Send")  # Button configured after connection
+tk.Label(app, text="Sunucu IP:").pack()
+server_ip_entry = tk.Entry(app)
+server_ip_entry.pack()
+server_ip_entry.insert(0, "127.0.0.1")
 
-root.mainloop()
+tk.Label(app, text="Port:").pack()
+server_port_entry = tk.Entry(app)
+server_port_entry.pack()
+server_port_entry.insert(0, "12345")
+
+tk.Label(app, text="Kullanıcı Adı:").pack()
+username_entry = tk.Entry(app)
+username_entry.pack()
+
+tk.Button(app, text="Bağlan", command=connect_to_server).pack()
+tk.Button(app, text="Dosya Gönder", command=send_file).pack()
+tk.Button(app, text="Dosya Listesi", command=request_file_list).pack()
+tk.Label(app, text="Silmek İstediğiniz Dosya:").pack()
+delete_file_name_entry = tk.Entry(app)
+delete_file_name_entry.pack()
+tk.Button(app, text="Dosya Sil", command=delete_file).pack()
+
+tk.Label(app, text="İndirmek İstediğiniz Dosya:").pack()
+file_name_entry = tk.Entry(app)
+file_name_entry.pack()
+
+tk.Button(app, text="Dosya İndir", command=download_file).pack()
+
+chat_area = tk.Text(app, wrap=tk.WORD, height=15, width=50)
+chat_area.pack()
+
+app.mainloop()

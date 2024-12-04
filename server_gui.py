@@ -1,88 +1,152 @@
 import socket
 import threading
-from tkinter import Tk, Label, Entry, Button, Listbox, END
+import tkinter as tk
+from tkinter import scrolledtext
+import os
 
-# Dictionary to store connected clients (name -> socket)
-connected_clients = {}
+clients = {}
+files = []  # Sunucuda mevcut dosyaların listesi
+file_owners = {}  # Dosya sahiplerini takip etmek için
 
-def broadcast(message, sender_name, log_box):
-    """Send a message to all clients except the sender."""
-    disconnected_clients = []
-    log_box.insert(END, f"Broadcasting: {sender_name}: {message}\n")  # Log the broadcast
 
-    for name, client_socket in connected_clients.items():
+# Server files directory
+FILES_DIR = "server_files"
+if not os.path.exists(FILES_DIR):
+    os.makedirs(FILES_DIR)
+
+def load_existing_files():
+    """server_files klasöründeki mevcut dosyaları yükler."""
+    global files
+    files = os.listdir(FILES_DIR)
+    log_message("server_files klasöründeki dosyalar yüklendi.")
+    log_message(f"Yüklü dosyalar: {', '.join(files) if files else 'Hiç dosya yok.'}")
+
+def broadcast_file_list():
+    """Tüm istemcilere güncellenmiş dosya listesini gönderir."""
+    file_list = "\n".join(files) if files else "Sunucuda dosya yok."
+    for client in list(clients.keys()):
         try:
-            if name != sender_name:
-                client_socket.send(f"{sender_name}: {message}".encode())
-        except Exception as e:
-            log_box.insert(END, f"Error sending to {name}: {e}\n")
-            disconnected_clients.append(name)
+            client.send(f"LIST:{file_list}".encode())
+        except:
+            client.close()
+            del clients[client]
 
-    # Remove disconnected clients
-    for name in disconnected_clients:
-        del connected_clients[name]
-        log_box.insert(END, f"{name} removed due to disconnection.\n")
-
-def handle_client(client_socket, client_address, log_box):
-    """Handle communication with a single client."""
+def handle_client(client_socket, client_address):
+    """İstemciyi yönetir."""
     try:
-        # Receive and validate the client's name
-        client_name = client_socket.recv(1024).decode().strip()
-        if not client_name or client_name in connected_clients:
-            client_socket.send("ERROR: Name already in use or invalid. Disconnecting.".encode())
-            log_box.insert(END, f"Invalid or duplicate name attempt from {client_address}\n")
+        username = client_socket.recv(1024).decode()
+
+        # Kullanıcı adı kontrolü
+        if username in clients.values():
+            client_socket.send("ERROR: Kullanıcı adı zaten kullanılıyor.".encode())
             client_socket.close()
             return
 
-        # Add the client to the connected list
-        connected_clients[client_name] = client_socket
-        log_box.insert(END, f"{client_name} connected from {client_address}\n")
-        broadcast(f"{client_name} has joined the chat.", "Server", log_box)
+        clients[client_socket] = username
+        log_message(f"{username} ({client_address}) bağlandı.")
 
-        # Handle incoming messages
         while True:
-            message = client_socket.recv(1024).decode().strip()
-            if not message or message.lower() == "exit":
-                break
-            log_box.insert(END, f"Message from {client_name}: {message}\n")
-            broadcast(message, client_name, log_box)
+            header = client_socket.recv(1024).decode()
+
+            if header.startswith("FILE:"):
+                file_name = header[5:]
+                new_file_name = f"{username}_{file_name}"
+                file_path = os.path.join(FILES_DIR, new_file_name)
+
+                file_data = client_socket.recv(1024 * 64)
+                with open(file_path, "wb") as f:
+                    f.write(file_data)
+
+                files.append(new_file_name)
+                file_owners[new_file_name] = username  # Track ownership
+                log_message(f"Dosya alındı ve kaydedildi: {new_file_name}")
+                broadcast_file_list()
+            elif header.startswith("DELETE:"):
+                file_name = header[7:]
+                if file_name in files and file_owners.get(file_name) == username:
+                    os.remove(os.path.join(FILES_DIR, file_name))
+                    files.remove(file_name)
+                    del file_owners[file_name]
+                    log_message(f"{username} dosyayı sildi: {file_name}")
+                    broadcast_file_list()
+                else:
+                    client_socket.send("ERROR: Dosya silme yetkiniz yok ya da bu dosya bulunmuyor.".encode())
+
+            elif header.startswith("LIST"):
+                log_message(f"{username} dosya listesini talep etti.")
+                file_list = "\n".join(files) if files else "Sunucuda dosya yok."
+                client_socket.send(f"LIST:{file_list}".encode())
+
+            elif header.startswith("DOWNLOAD:"):
+                requested_file = header[9:]
+                requested_path = os.path.join(FILES_DIR, requested_file)
+
+                if requested_file in files and os.path.exists(requested_path):
+                    client_socket.send(f"FILE:{requested_file}".encode())
+                    with open(requested_path, "rb") as f:
+                        client_socket.send(f.read())
+                    log_message(f"{username}, {requested_file} dosyasını indirdi.")
+
+                    # Notify the file owner
+                    file_owner = file_owners.get(requested_file)
+                    if file_owner and file_owner != username:
+                        for client, owner in clients.items():
+                            if owner == file_owner:
+                                client.send(f"NOTIFY: {username} dosyanızı indirdi: {requested_file}".encode())
+                else:
+                    client_socket.send("ERROR: Dosya bulunamadı.".encode())
+
+            elif header.startswith("NOTIFY:"):
+                log_message(header[7:])
+                
+
 
     except Exception as e:
-        log_box.insert(END, f"Error with {client_address}: {e}\n")
-
+        log_message(f"Hata: {e}")
     finally:
-        if client_name in connected_clients:
-            del connected_clients[client_name]
-            log_box.insert(END, f"{client_name} disconnected.\n")
-            broadcast(f"{client_name} has left the chat.", "Server", log_box)
+        if client_socket in clients:
+            log_message(f"{clients[client_socket]} bağlantıyı kesti.")
+            del clients[client_socket]
         client_socket.close()
 
-def start_server(port, log_box):
-    """Start the server and listen for client connections."""
+def log_message(message):
+    """Log mesajlarını GUI'ye ekler."""
+    log_area.insert(tk.END, f"{message}\n")
+    log_area.yview(tk.END)
+
+def start_server_thread():
+    threading.Thread(target=start_server, daemon=True).start()
+
+def start_server():
+    """Sunucuyu başlatır."""
+    load_existing_files()  # Mevcut dosyaları yükle
+
+    host = "0.0.0.0"
+    port = int(port_entry.get())
+
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(("0.0.0.0", int(port)))
+    server_socket.bind((host, port))
     server_socket.listen(5)
-    log_box.insert(END, f"Server is listening on port {port}\n")
+    log_message(f"Sunucu {host}:{port} üzerinde başlatıldı.")
 
-    def accept_clients():
-        while True:
-            client_socket, client_address = server_socket.accept()
-            threading.Thread(target=handle_client, args=(client_socket, client_address, log_box), daemon=True).start()
+    while True:
+        client_socket, client_address = server_socket.accept()
+        client_thread = threading.Thread(target=handle_client, args=(client_socket, client_address))
+        client_thread.start()
 
-    threading.Thread(target=accept_clients, daemon=True).start()
+# GUI
+app = tk.Tk()
+app.title("Sunucu")
 
-# GUI setup
-root = Tk()
-root.title("Server GUI")
+tk.Label(app, text="Port:").pack(pady=5)
+port_entry = tk.Entry(app)
+port_entry.pack(pady=5)
+port_entry.insert(0, "12345")
 
-Label(root, text="Port:").pack()
-port_entry = Entry(root)
-port_entry.pack()
+start_button = tk.Button(app, text="Sunucuyu Başlat", command=start_server_thread)
+start_button.pack(pady=5)
 
-log_box = Listbox(root, width=50, height=20)
-log_box.pack()
+log_area = scrolledtext.ScrolledText(app, wrap=tk.WORD, state="normal", height=20, width=50)
+log_area.pack(pady=5)
 
-start_button = Button(root, text="Start Server", command=lambda: start_server(port_entry.get(), log_box))
-start_button.pack()
-
-root.mainloop()
+app.mainloop()
