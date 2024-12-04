@@ -1,137 +1,137 @@
-import socket
+import socket  
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-def receive_messages():
+def receive_messages(): 
     """Listens for messages from the server and displays them on the screen."""
-    while True:
-        try:
-            message = client_socket.recv(1024).decode()
+    while True:     
+        try:    
+            message = client_socket.recv(1024).decode() # Receive message from server
 
-            if message.startswith("FILE:"):
-                file_name = message[5:]
+            if message.startswith("FILE:"):   # Check if the message is a file transfer
+                file_name = message[5:]    # Extract the file name from the message
                 log_message(f"Downloading file: {file_name}")
                 
-                with open(file_name, "wb") as f:
+                with open(file_name, "wb") as f:    # Open the file in write-binary mode
                     while True:
-                        chunk = client_socket.recv(1024 * 64)
+                        chunk = client_socket.recv(1024 * 64) # Receive data in chunks of 64 KB
                         if chunk == b"EOF":  # Check for end-of-file signal
-                            break
-                        f.write(chunk)
-                log_message(f"File downloaded: {file_name}")
+                            break  # Exit the loop if the end-of-file signal is received
+                        f.write(chunk) # Write the received data to the file
+                log_message(f"File downloaded: {file_name}")  # Log the successful download
 
-            elif message.startswith("LIST:"):
-                file_list = message[5:]
-                log_message(f"File List:\n{file_list}")
+            elif message.startswith("LIST:"):  # Check if the message is a file list
+                file_list = message[5:]   # Extract the file list from the message
+                log_message(f"File List:\n{file_list}")  # Log the file list
 
-            elif message.startswith("ERROR:"):
+            elif message.startswith("ERROR:"):      # Check if the message is an error message
                 log_message(message)
 
-            else:
-                log_message(f"From server: {message}")
-        except Exception as e:
-            log_message(f"Error: {e}")
+            else:   # If the message is a regular text message
+                log_message(f"From server: {message}")  # Log the message
+        except Exception as e:  # Handle exceptions
+            log_message(f"Error: {e}")  # Log the error
             break
         
-def delete_file():
-    file_name = delete_file_name_entry.get()
-    if file_name:
+def delete_file():     # Function to delete a file 
+    file_name = delete_file_name_entry.get() # Get the file name from the entry widget
+    if file_name:  # Check if the file name is not empty
         try:
-            client_socket.send(f"DELETE:{file_name}".encode())
-            log_message(f"Delete request sent: {file_name}")
-        except Exception as e:
+            client_socket.send(f"DELETE:{file_name}".encode()) # Send the delete request to the server
+            log_message(f"Delete request sent: {file_name}") # Log the delete request
+        except Exception as e:  # Handle exceptions
             log_message(f"Error: {e}")
     else:
         messagebox.showerror("Error", "Please enter a file name to delete.")
 
-def send_file():
-    file_path = filedialog.askopenfilename(filetypes=[("All Files", "*.*")])
-    if not file_path:
-        return
+def send_file():   # Function to send a file
+    file_path = filedialog.askopenfilename(filetypes=[("All Files", "*.*")]) # Open a file dialog to select a file
+    if not file_path:   # Check if a file was selected
+        return  # Exit the function if no file was selected
 
-    try:
-        file_name = file_path.split("/")[-1]
-        client_socket.send(f"FILE:{file_name}".encode())
+    try:    # Try to send the file
+        file_name = file_path.split("/")[-1]    # Extract the file name from the file path
+        client_socket.send(f"FILE:{file_name}".encode())    # Send the file name to the server
 
-        with open(file_path, "rb") as f:
-            client_socket.send(f.read())
-        log_message(f"File sent: {file_name}")
-    except Exception as e:
-        log_message(f"Error: {e}")
+        with open(file_path, "rb") as f:    # Open the file in read-binary mode
+            client_socket.send(f.read())    # Send the file data to the server
+        log_message(f"File sent: {file_name}")  # Log the successful file transfer
+    except Exception as e:  # Handle exceptions
+        log_message(f"Error: {e}")  # Log the error
 
-def request_file_list():
+def request_file_list():    # Function to request the file list from the server
     """Requests the file list from the server."""
     try:
-        client_socket.send("LIST".encode())
-    except Exception as e:
+        client_socket.send("LIST".encode()) # Send the list request to the server
+    except Exception as e:  # Handle exceptions
         log_message(f"Error: {e}")
 
-def download_file():
-    file_name = file_name_entry.get()
-    if file_name:
-        client_socket.send(f"DOWNLOAD:{file_name}".encode())
-    else:
+def download_file():    # Function to download a file
+    file_name = file_name_entry.get()   # Get the file name from the entry widget
+    if file_name:   # Check if the file name is not empty
+        client_socket.send(f"DOWNLOAD:{file_name}".encode())    # Send the download request to the server
+    else:       # If the file name is empty
         messagebox.showerror("Error", "Please enter a file name to download.")
 
-def connect_to_server():
-    global client_socket
-    try:
-        server_ip = server_ip_entry.get()
-        server_port = int(server_port_entry.get())
-        username = username_entry.get()
+def connect_to_server():    # Function to connect to the server
+    global client_socket    # Declare the client_socket as a global variable
+    try:    # Try to connect to the server
+        server_ip = server_ip_entry.get()   # Get the server IP address from the entry widget
+        server_port = int(server_port_entry.get())  # Get the server port number from the entry widget
+        username = username_entry.get() # Get the username from the entry widget
 
-        if not username:
-            messagebox.showerror("Error", "Username cannot be empty!")
-            return
+        if not username:    # Check if the username is empty
+            messagebox.showerror("Error", "Username cannot be empty!")  # Show an error message
+            return  # Exit the function
 
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((server_ip, server_port))
-        client_socket.send(username.encode())
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)   # Create a new socket
+        client_socket.connect((server_ip, server_port)) # Connect to the server
+        client_socket.send(username.encode())   # Send the username to the server
 
-        threading.Thread(target=receive_messages, daemon=True).start()
-        log_message("Connected to the server.")
+        threading.Thread(target=receive_messages, daemon=True).start()  # Start a new thread to receive messages
+        log_message("Connected to the server.")   # Log the successful connection
     except Exception as e:
         messagebox.showerror("Error", f"Unable to connect: {e}")
 
-def log_message(message):
-    chat_area.insert(tk.END, f"{message}\n")
+def log_message(message):   # Function to log messages in the chat area
+    chat_area.insert(tk.END, f"{message}\n")    # Insert the message at the end of the chat area
     chat_area.yview(tk.END)
 
 # GUI
-app = tk.Tk()
-app.title("File Client")
+app = tk.Tk()   # Create the main application window
+app.title("File Client")    # Set the title of the window
 
-tk.Label(app, text="Server IP:").pack()
-server_ip_entry = tk.Entry(app)
-server_ip_entry.pack()
-server_ip_entry.insert(0, "127.0.0.1")
+tk.Label(app, text="Server IP:").pack()   # Create a label widget
+server_ip_entry = tk.Entry(app) # Create an entry widget
+server_ip_entry.pack()  # Place the entry widget in the window
+server_ip_entry.insert(0, "127.0.0.1")  # Set the default server IP address
 
-tk.Label(app, text="Port:").pack()
-server_port_entry = tk.Entry(app)
-server_port_entry.pack()
-server_port_entry.insert(0, "12345")
+tk.Label(app, text="Port:").pack()  # Create a label widget
+server_port_entry = tk.Entry(app)   # Create an entry widget
+server_port_entry.pack()        # Place the entry widget in the window
+server_port_entry.insert(0, "12345")    # Set the default server port number
 
-tk.Label(app, text="Username:").pack()
-username_entry = tk.Entry(app)
-username_entry.pack()
+tk.Label(app, text="Username:").pack()  # Create a label widget  
+username_entry = tk.Entry(app)      # Create an entry widget
+username_entry.pack()        # Place the entry widget in the window
 
-tk.Button(app, text="Connect", command=connect_to_server).pack()
-tk.Button(app, text="Send File", command=send_file).pack()
-tk.Button(app, text="Request File List", command=request_file_list).pack()
+tk.Button(app, text="Connect", command=connect_to_server).pack()    # Create a button widget For connecting to the server
+tk.Button(app, text="Send File", command=send_file).pack()      # Create a button widget for sending files
+tk.Button(app, text="Request File List", command=request_file_list).pack()  # Create a button widget   for requesting the file list
 
-tk.Label(app, text="File to Delete:").pack()
-delete_file_name_entry = tk.Entry(app)
-delete_file_name_entry.pack()
-tk.Button(app, text="Delete File", command=delete_file).pack()
+tk.Label(app, text="File to Delete:").pack()    # Create a label widget for deleting files
+delete_file_name_entry = tk.Entry(app)  # Create an entry widget for deleting files
+delete_file_name_entry.pack()   # Place the entry widget in the window
+tk.Button(app, text="Delete File", command=delete_file).pack()  # Create a button widget for deleting files
 
-tk.Label(app, text="File to Download:").pack()
-file_name_entry = tk.Entry(app)
-file_name_entry.pack()
+tk.Label(app, text="File to Download:").pack()  # Create a label widget for downloading files
+file_name_entry = tk.Entry(app) # Create an entry widget for downloading files
+file_name_entry.pack()  # Place the entry widget in the window
 
-tk.Button(app, text="Download File", command=download_file).pack()
+tk.Button(app, text="Download File", command=download_file).pack()  # Create a button widget for downloading files
 
-chat_area = tk.Text(app, wrap=tk.WORD, height=15, width=50)
-chat_area.pack()
+chat_area = tk.Text(app, wrap=tk.WORD, height=15, width=50) # Create a text widget for displaying chat messages
+chat_area.pack()    # Place the text widget in the window
 
-app.mainloop()
+app.mainloop()  # Start the main event loop
