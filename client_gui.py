@@ -8,26 +8,32 @@ def receive_messages():
     while True:
         try:
             message = client_socket.recv(1024).decode()
-            if message.startswith("ERROR:"):
-                log_message(f"Error from server: {message[6:]}")  # Log the error
-                client_socket.close()  # Close the socket connection
-                break  # Exit the loop
+
+            if message.startswith("FILE:"):
+                file_name = message[5:]
+                log_message(f"Downloading file: {file_name}")
+                
+                with open(file_name, "wb") as f:
+                    while True:
+                        chunk = client_socket.recv(1024 * 64)
+                        if chunk == b"EOF":  # Check for end-of-file signal
+                            break
+                        f.write(chunk)
+                log_message(f"File downloaded: {file_name}")
+
             elif message.startswith("LIST:"):
                 file_list = message[5:]
                 log_message(f"File List:\n{file_list}")
-            elif message.startswith("FILE:"):
-                file_name = message[5:]
-                file_data = client_socket.recv(1024 * 64)
 
-                with open(file_name, "wb") as f:
-                    f.write(file_data)
-                log_message(f"File downloaded: {file_name}")
+            elif message.startswith("ERROR:"):
+                log_message(message)
+
             else:
                 log_message(f"From server: {message}")
         except Exception as e:
             log_message(f"Error: {e}")
             break
-
+        
 def delete_file():
     file_name = delete_file_name_entry.get()
     if file_name:
