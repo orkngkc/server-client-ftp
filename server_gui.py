@@ -57,9 +57,12 @@ def handle_client(client_socket, client_address):
                 with open(file_path, "wb") as f:
                     f.write(file_data)
 
-                files.append(new_file_name)
-                file_owners[new_file_name] = username  # Track ownership
-                log_message(f"Dosya alındı ve kaydedildi: {new_file_name}")
+                if new_file_name in files:
+                    log_message(f"{new_file_name} dosyası zaten mevcut. Üzerine yazılıyor.")
+                else:
+                    files.append(new_file_name)
+                    log_message(f"{new_file_name} dosyası kaydedildi ve listeye eklendi.")
+                    file_owners[new_file_name] = username  # Track ownership
                 broadcast_file_list()
             elif header.startswith("DELETE:"):
                 file_name = header[7:]
