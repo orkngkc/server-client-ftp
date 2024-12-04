@@ -100,6 +100,14 @@ def handle_client(client_socket, client_address):
                             client_socket.send(chunk)
                     client_socket.send(b"EOF")  # Signal the end of the file transfer
                     log_message(f"{username} downloaded the file: {requested_file}")
+                    file_owner = file_owners.get(requested_file)
+                    if file_owner and file_owner != username:  # Ensure the owner is notified only if it's not the downloader
+                        for client, owner in clients.items():
+                            if owner == file_owner:
+                                try:
+                                    client.send(f"NOTIFY: {username} downloaded your file: {requested_file}".encode())
+                                except Exception as e:
+                                    log_message(f"Error notifying {file_owner}: {e}")
                 else:
                     client_socket.send("ERROR: File not found.".encode())
     except Exception as e:
