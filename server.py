@@ -56,9 +56,12 @@ def handle_client(client_socket, client_address):
                 with open(file_path, "wb") as f:
                     f.write(file_data)
 
-                # Dosya listesine ekle
-                files.append(new_file_name)
-                log_message(f"Dosya alındı ve kaydedildi: {new_file_name}")
+                # Dosya listesine eklemeden önce kontrol et
+                if new_file_name in files:
+                    log_message(f"{new_file_name} dosyası zaten mevcut. Üzerine yazılıyor.")
+                else:
+                    files.append(new_file_name)
+                    log_message(f"{new_file_name} dosyası kaydedildi ve listeye eklendi.")
 
                 # Dosya listesini güncelle
                 broadcast_file_list()
