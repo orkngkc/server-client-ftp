@@ -1,24 +1,23 @@
 import socket
 import threading
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, filedialog
 import os
 
 clients = {}
 files = []  # Sunucuda mevcut dosyaların listesi
 file_owners = {}  # Dosya sahiplerini takip etmek için
 
-
-# Server files directory
+# Default directory for storing files
 FILES_DIR = "server_files"
 if not os.path.exists(FILES_DIR):
     os.makedirs(FILES_DIR)
 
 def load_existing_files():
-    """server_files klasöründeki mevcut dosyaları yükler."""
+    """Seçili dosya depolama klasöründeki mevcut dosyaları yükler."""
     global files
     files = os.listdir(FILES_DIR)
-    log_message("server_files klasöründeki dosyalar yüklendi.")
+    log_message("Dosya depolama klasöründeki dosyalar yüklendi.")
     log_message(f"Yüklü dosyalar: {', '.join(files) if files else 'Hiç dosya yok.'}")
 
 def broadcast_file_list():
@@ -61,7 +60,7 @@ def handle_client(client_socket, client_address):
                     log_message(f"{new_file_name} dosyası zaten mevcut. Üzerine yazılıyor.")
                 else:
                     files.append(new_file_name)
-                    log_message(f"{new_file_name} dosyası kaydedildi ve listeye eklendi.")
+                    log_message(f"{new_file_name} dosyası kaydedildi ve listeye eklendi.")
                     file_owners[new_file_name] = username  # Track ownership
                 broadcast_file_list()
             elif header.startswith("DELETE:"):
@@ -98,12 +97,6 @@ def handle_client(client_socket, client_address):
                                 client.send(f"NOTIFY: {username} dosyanızı indirdi: {requested_file}".encode())
                 else:
                     client_socket.send("ERROR: Dosya bulunamadı.".encode())
-
-            elif header.startswith("NOTIFY:"):
-                log_message(header[7:])
-                
-
-
     except Exception as e:
         log_message(f"Hata: {e}")
     finally:
@@ -116,6 +109,15 @@ def log_message(message):
     """Log mesajlarını GUI'ye ekler."""
     log_area.insert(tk.END, f"{message}\n")
     log_area.yview(tk.END)
+
+def change_directory():
+    """Dosyaların depolanacağı dizini değiştirir."""
+    global FILES_DIR
+    selected_dir = filedialog.askdirectory()
+    if selected_dir:
+        FILES_DIR = selected_dir
+        load_existing_files()
+        log_message(f"Dosyaların depolanacağı dizin değiştirildi: {FILES_DIR}")
 
 def start_server_thread():
     threading.Thread(target=start_server, daemon=True).start()
@@ -145,6 +147,8 @@ tk.Label(app, text="Port:").pack(pady=5)
 port_entry = tk.Entry(app)
 port_entry.pack(pady=5)
 port_entry.insert(0, "12345")
+
+tk.Button(app, text="Depolama Dizini Seç", command=change_directory).pack(pady=5)
 
 start_button = tk.Button(app, text="Sunucuyu Başlat", command=start_server_thread)
 start_button.pack(pady=5)
