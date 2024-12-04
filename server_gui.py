@@ -5,8 +5,8 @@ from tkinter import scrolledtext, filedialog
 import os
 
 clients = {}
-files = []  # Sunucuda mevcut dosyaların listesi
-file_owners = {}  # Dosya sahiplerini takip etmek için
+files = []  # List of files on the server
+file_owners = {}  # Tracks file ownership
 
 # Default directory for storing files
 FILES_DIR = "server_files"
@@ -14,15 +14,15 @@ if not os.path.exists(FILES_DIR):
     os.makedirs(FILES_DIR)
 
 def load_existing_files():
-    """Seçili dosya depolama klasöründeki mevcut dosyaları yükler."""
+    """Loads existing files from the selected storage directory."""
     global files
     files = os.listdir(FILES_DIR)
-    log_message("Dosya depolama klasöründeki dosyalar yüklendi.")
-    log_message(f"Yüklü dosyalar: {', '.join(files) if files else 'Hiç dosya yok.'}")
+    log_message("Files loaded from the storage directory.")
+    log_message(f"Loaded files: {', '.join(files) if files else 'No files found.'}")
 
 def broadcast_file_list():
-    """Tüm istemcilere güncellenmiş dosya listesini gönderir."""
-    file_list = "\n".join(files) if files else "Sunucuda dosya yok."
+    """Sends the updated file list to all clients."""
+    file_list = "\n".join(files) if files else "No files on the server."
     for client in list(clients.keys()):
         try:
             client.send(f"LIST:{file_list}".encode())
@@ -31,18 +31,17 @@ def broadcast_file_list():
             del clients[client]
 
 def handle_client(client_socket, client_address):
-    """İstemciyi yönetir."""
+    """Handles the client."""
     try:
         username = client_socket.recv(1024).decode()
 
-        # Kullanıcı adı kontrolü
         if username in clients.values():
-            client_socket.send("ERROR: Kullanıcı adı zaten kullanılıyor.".encode())
-            client_socket.close()
-            return
+            client_socket.send("ERROR: Username already in use.".encode())
+            client_socket.close()  # Ensure the socket is closed
+            return 
 
         clients[client_socket] = username
-        log_message(f"{username} ({client_address}) bağlandı.")
+        log_message(f"{username} ({client_address}) connected.")
 
         while True:
             header = client_socket.recv(1024).decode()
@@ -57,10 +56,10 @@ def handle_client(client_socket, client_address):
                     f.write(file_data)
 
                 if new_file_name in files:
-                    log_message(f"{new_file_name} dosyası zaten mevcut. Üzerine yazılıyor.")
+                    log_message(f"The file {new_file_name} already exists. Overwriting.")
                 else:
                     files.append(new_file_name)
-                    log_message(f"{new_file_name} dosyası kaydedildi ve listeye eklendi.")
+                    log_message(f"The file {new_file_name} was saved and added to the list.")
                     file_owners[new_file_name] = username  # Track ownership
                 broadcast_file_list()
             elif header.startswith("DELETE:"):
@@ -69,14 +68,14 @@ def handle_client(client_socket, client_address):
                     os.remove(os.path.join(FILES_DIR, file_name))
                     files.remove(file_name)
                     del file_owners[file_name]
-                    log_message(f"{username} dosyayı sildi: {file_name}")
+                    log_message(f"{username} deleted the file: {file_name}")
                     broadcast_file_list()
                 else:
-                    client_socket.send("ERROR: Dosya silme yetkiniz yok ya da bu dosya bulunmuyor.".encode())
+                    client_socket.send("ERROR: You do not have permission to delete this file or the file does not exist.".encode())
 
             elif header.startswith("LIST"):
-                log_message(f"{username} dosya listesini talep etti.")
-                file_list = "\n".join(files) if files else "Sunucuda dosya yok."
+                log_message(f"{username} requested the file list.")
+                file_list = "\n".join(files) if files else "No files on the server."
                 client_socket.send(f"LIST:{file_list}".encode())
 
             elif header.startswith("DOWNLOAD:"):
@@ -87,44 +86,44 @@ def handle_client(client_socket, client_address):
                     client_socket.send(f"FILE:{requested_file}".encode())
                     with open(requested_path, "rb") as f:
                         client_socket.send(f.read())
-                    log_message(f"{username}, {requested_file} dosyasını indirdi.")
+                    log_message(f"{username} downloaded the file: {requested_file}")
 
                     # Notify the file owner
                     file_owner = file_owners.get(requested_file)
                     if file_owner and file_owner != username:
                         for client, owner in clients.items():
                             if owner == file_owner:
-                                client.send(f"NOTIFY: {username} dosyanızı indirdi: {requested_file}".encode())
+                                client.send(f"NOTIFY: {username} downloaded your file: {requested_file}".encode())
                 else:
-                    client_socket.send("ERROR: Dosya bulunamadı.".encode())
+                    client_socket.send("ERROR: File not found.".encode())
     except Exception as e:
-        log_message(f"Hata: {e}")
+        log_message(f"Error: {e}")
     finally:
         if client_socket in clients:
-            log_message(f"{clients[client_socket]} bağlantıyı kesti.")
+            log_message(f"{clients[client_socket]} disconnected.")
             del clients[client_socket]
         client_socket.close()
 
 def log_message(message):
-    """Log mesajlarını GUI'ye ekler."""
+    """Adds log messages to the GUI."""
     log_area.insert(tk.END, f"{message}\n")
     log_area.yview(tk.END)
 
 def change_directory():
-    """Dosyaların depolanacağı dizini değiştirir."""
+    """Changes the directory for storing files."""
     global FILES_DIR
     selected_dir = filedialog.askdirectory()
     if selected_dir:
         FILES_DIR = selected_dir
         load_existing_files()
-        log_message(f"Dosyaların depolanacağı dizin değiştirildi: {FILES_DIR}")
+        log_message(f"The storage directory was changed to: {FILES_DIR}")
 
 def start_server_thread():
     threading.Thread(target=start_server, daemon=True).start()
 
 def start_server():
-    """Sunucuyu başlatır."""
-    load_existing_files()  # Mevcut dosyaları yükle
+    """Starts the server."""
+    load_existing_files()
 
     host = "0.0.0.0"
     port = int(port_entry.get())
@@ -132,7 +131,7 @@ def start_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
     server_socket.listen(5)
-    log_message(f"Sunucu {host}:{port} üzerinde başlatıldı.")
+    log_message(f"Server started on {host}:{port}")
 
     while True:
         client_socket, client_address = server_socket.accept()
@@ -141,19 +140,20 @@ def start_server():
 
 # GUI
 app = tk.Tk()
-app.title("Sunucu")
+app.title("Server")
 
 tk.Label(app, text="Port:").pack(pady=5)
 port_entry = tk.Entry(app)
 port_entry.pack(pady=5)
 port_entry.insert(0, "12345")
 
-tk.Button(app, text="Depolama Dizini Seç", command=change_directory).pack(pady=5)
+tk.Button(app, text="Select Storage Directory", command=change_directory).pack(pady=5)
 
-start_button = tk.Button(app, text="Sunucuyu Başlat", command=start_server_thread)
+start_button = tk.Button(app, text="Start Server", command=start_server_thread)
 start_button.pack(pady=5)
 
 log_area = scrolledtext.ScrolledText(app, wrap=tk.WORD, state="normal", height=20, width=50)
 log_area.pack(pady=5)
 
 app.mainloop()
+# End of server_gui.py
