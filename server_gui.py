@@ -96,8 +96,8 @@ def handle_client(client_socket, client_address):     # Handles the client
                 if requested_file in files and os.path.exists(requested_path): # Check if the file exists
                     client_socket.send(f"FILE:{requested_file}".encode())
                     with open(requested_path, "rb") as f: 
-                        while chunk := f.read(1024 * 64):  # Send the file in chunks
-                            client_socket.send(chunk)   
+                        file_data = f.read()
+                        client_socket.send(file_data)
                     client_socket.send(b"EOF")  # Signal the end of the file transfer
                     log_message(f"{username} downloaded the file: {requested_file}") # Log the download
                     file_owner = file_owners.get(requested_file) # Get the owner of the file

@@ -12,13 +12,16 @@ def receive_messages():
             if message.startswith("FILE:"):   # Check if the message is a file transfer
                 file_name = message[5:]    # Extract the file name from the message
                 log_message(f"Downloading file: {file_name}")
-                
-                with open(file_name, "wb") as f:    # Open the file in write-binary mode
-                    while True:
-                        chunk = client_socket.recv(1024 * 64) # Receive data in chunks of 64 KB
-                        if chunk == b"EOF":  # Check for end-of-file signal
-                            break  # Exit the loop if the end-of-file signal is received
-                        f.write(chunk) # Write the received data to the file
+                file_data = b""  # Initialize an empty byte string
+                while True:
+                    chunk = client_socket.recv(1024 * 64)  # 64 KB'lık parçalarda veri alın
+                    if b"EOF" in chunk:  # EOF sinyalini kontrol edin
+                        file_data += chunk.replace(b"EOF", b"")  # EOF'yi kaldırın
+                        break
+                    file_data += chunk 
+
+                with open(file_name, "wb") as f:
+                    f.write(file_data)  # Write the entire file data at once                         
                 log_message(f"File downloaded: {file_name}")  # Log the successful download
 
             elif message.startswith("LIST:"):  # Check if the message is a file list
