@@ -14,7 +14,7 @@ def receive_messages():
                 log_message(f"Downloading file: {file_name}")
                 file_data = b""  # Initialize an empty byte string
                 while True:
-                    chunk = client_socket.recv(1024 * 64)  # 64 KB'lık parçalarda veri alın
+                    chunk = client_socket.recv(1024 * 64000)  # 64 KB'lık parçalarda veri alın
                     if b"EOF" in chunk:  # EOF sinyalini kontrol edin
                         file_data += chunk.replace(b"EOF", b"")  # EOF'yi kaldırın
                         break

@@ -62,7 +62,7 @@ def handle_client(client_socket, client_address):     # Handles the client
                 new_file_name = f"{username}_{file_name}"     # Add the username to the file name
                 file_path = os.path.join(FILES_DIR, new_file_name)    # Create the file path
 
-                file_data = client_socket.recv(1024 * 64)  # Receive the file data
+                file_data = client_socket.recv(1024 * 64000)  # Receive the file data
                 with open(file_path, "wb") as f:   # Write the file data to the file
                     f.write(file_data)    # Write the file data to the file
 
