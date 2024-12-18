@@ -8,10 +8,7 @@ clients = {}   # List of connected clients
 files = []  # List of files on the server
 file_owners = {}  # Tracks file ownership
 
-# Default directory for storing files
-FILES_DIR = "server_files"
-if not os.path.exists(FILES_DIR): # Create the directory if it doesn't exist
-    os.makedirs(FILES_DIR)  # Create the directory if it doesn't exist
+
 
 def load_existing_files():      # Load existing files from the selected storage directory and assigns ownership
     """Loads existing files from the selected storage directory and assigns ownership."""
@@ -83,6 +80,9 @@ def handle_client(client_socket, client_address):     # Handles the client
                     broadcast_file_list()
                 else:
                     client_socket.send("ERROR: You do not have permission to delete this file or the file does not exist.".encode())
+            elif header == "DISCONNECT":
+                log_message(f"{username} requested to disconnect.")
+                break  # Exit the loop to disconnect the client
 
             elif header.startswith("LIST"): # Check if the header is for a file list request
                 log_message(f"{username} requested the file list.") # Log the request
@@ -152,22 +152,34 @@ def start_server(): # Starts the server
         client_thread = threading.Thread(target=handle_client, args=(client_socket, client_address)) # Create a new thread for the client
         client_thread.start() # Start the client thread
 
+def change_directory():
+    """Changes the directory for storing files."""
+    global FILES_DIR, start_button  # Declare start_button as global
+    selected_dir = filedialog.askdirectory()  # Open a dialog to select a directory
+    if selected_dir:  # Check if a directory was selected
+        FILES_DIR = selected_dir  # Update the storage directory
+        load_existing_files()  # Reload the files from the new directory
+        log_message(f"The storage directory was changed to: {FILES_DIR}")
+        start_button.config(state="normal")  # Enable the "Start Server" button
+        start_button.update_idletasks()  # Force GUI refresh
+        log_message("Start Server button enabled.")
+
+
 # GUI
 app = tk.Tk()  # Create the main application window
 app.title("Server")
 
-tk.Label(app, text="Port:").pack(pady=5) # Add a label for the port entry field
+tk.Label(app, text="Port:").pack(pady=5)  # Add a label for the port entry field
 port_entry = tk.Entry(app)
-port_entry.pack(pady=5)     # Add an entry field for the port
-port_entry.insert(0, "12345")   # Set the default port number
+port_entry.pack(pady=5)  # Add an entry field for the port
+port_entry.insert(0, "12345")  # Set the default port number
 
-tk.Button(app, text="Select Storage Directory", command=change_directory).pack(pady=5) # Add a button to change the storage directory
+tk.Button(app, text="Select Storage Directory", command=change_directory).pack(pady=5)  # Add a button to change the storage directory
 
-start_button = tk.Button(app, text="Start Server", command=start_server_thread) # Add a button to start the server
-start_button.pack(pady=5) # Pack the start button
+start_button = tk.Button(app, text="Start Server", command=start_server_thread, state="disabled")  # Initially disabled
+start_button.pack(pady=5)  # Pack the start button
 
-log_area = scrolledtext.ScrolledText(app, wrap=tk.WORD, state="normal", height=20, width=50) # Add a scrolled text area for logging
-log_area.pack(pady=5) # Pack the log area
+log_area = scrolledtext.ScrolledText(app, wrap=tk.WORD, state="normal", height=20, width=50)  # Add a scrolled text area for logging
+log_area.pack(pady=5)  # Pack the log area
 
 app.mainloop()
-# End of server_gui.py

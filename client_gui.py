@@ -102,6 +102,17 @@ def log_message(message):   # Function to log messages in the chat area
     chat_area.insert(tk.END, f"{message}\n")    # Insert the message at the end of the chat area
     chat_area.yview(tk.END)
 
+def disconnect_from_server():
+    """Disconnects the client from the server and closes the application."""
+    global client_socket
+    try:
+        client_socket.send("DISCONNECT".encode())  # Inform the server of disconnection
+        client_socket.close()  # Close the client socket
+        log_message("Disconnected from the server.")
+    except Exception as e:
+        log_message(f"Error during disconnection: {e}")
+    finally:
+        app.destroy()  # Close the client application window
 # GUI
 app = tk.Tk()   # Create the main application window
 app.title("File Client")    # Set the title of the window
@@ -134,6 +145,8 @@ file_name_entry = tk.Entry(app) # Create an entry widget for downloading files
 file_name_entry.pack()  # Place the entry widget in the window
 
 tk.Button(app, text="Download File", command=download_file).pack()  # Create a button widget for downloading files
+# Adding a Disconnect button in the GUI
+tk.Button(app, text="Disconnect", command=disconnect_from_server).pack()
 
 chat_area = tk.Text(app, wrap=tk.WORD, height=15, width=50) # Create a text widget for displaying chat messages
 chat_area.pack()    # Place the text widget in the window
