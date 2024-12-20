@@ -2,27 +2,44 @@ import socket
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
-
+import os
 def receive_messages(): 
     """Listens for messages from the server and displays them on the screen."""
     while True:     
         try:    
             message = client_socket.recv(1024).decode() # Receive message from server
 
-            if message.startswith("FILE:"):   # Check if the message is a file transfer
-                file_name = message[5:]    # Extract the file name from the message
-                log_message(f"Downloading file: {file_name}")
-                file_data = b""  # Initialize an empty byte string
-                while True:
-                    chunk = client_socket.recv(1024 * 64000)  # 64 KB'lık parçalarda veri alın
-                    if b"EOF" in chunk:  # EOF sinyalini kontrol edin
-                        file_data += chunk.replace(b"EOF", b"")  # EOF'yi kaldırın
-                        break
-                    file_data += chunk 
+            if message.startswith("FILE:"):  # Check if the message is a file transfer
+                file_name = message[5:]  # Extract the file name
+                log_message(f"Preparing to download file: {file_name}")
+                
+                # Open a directory selection dialog
+                directory = filedialog.askdirectory(title="Select Directory to Save File")
+                if not directory:  # If no directory is selected
+                    log_message("Download cancelled: No directory selected.")
+                    continue  # Skip the current iteration
 
-                with open(file_name, "wb") as f:
-                    f.write(file_data)  # Write the entire file data at once                         
-                log_message(f"File downloaded: {file_name}")  # Log the successful download
+                # Define the full path where the file will be saved
+                file_path = os.path.join(directory, file_name)
+                log_message(f"Saving to: {file_path}")
+
+                # Initialize a byte string to receive the file data
+                file_data = b""
+                while True:
+                    chunk = client_socket.recv(1024 * 64)  # Receive data in 64 KB chunks
+                    if b"EOF" in chunk:  # Check for EOF signal
+                        file_data += chunk.replace(b"EOF", b"")  # Remove EOF marker
+                        break
+                    file_data += chunk
+
+                # Save the received data to the selected path
+                try:
+                    with open(file_path, "wb") as f:
+                        f.write(file_data)
+                    log_message(f"File successfully downloaded and saved to: {file_path}")
+                except Exception as e:
+                    log_message(f"Error saving file: {e}")
+
 
             elif message.startswith("LIST:"):  # Check if the message is a file list
                 file_list = message[5:]   # Extract the file list from the message

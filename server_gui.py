@@ -72,6 +72,7 @@ def handle_client(client_socket, client_address):     # Handles the client
                 broadcast_file_list()     # Broadcast the updated file list
             elif header.startswith("DELETE:"):    # Check if the header is for a file deletion
                 file_name = header[7:]  # Extract the file name
+                log_message(f"{username} requested to delete the file: {file_name}")  # Log the deletion request
                 if file_name in files and file_owners.get(file_name) == username: # Check if the file exists and the user is the owner
                     os.remove(os.path.join(FILES_DIR, file_name)) # Remove the file from the storage directory
                     files.remove(file_name) # Remove the file from the list of files
