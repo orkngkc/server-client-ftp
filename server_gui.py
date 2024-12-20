@@ -43,7 +43,8 @@ def handle_client(client_socket, client_address):     # Handles the client
     try:
         username = client_socket.recv(1024).decode()    # Receive the username from the client
 
-        if username in clients.values():       # Check if the username is already in use
+        if username in clients.values(): 
+            log_message(f"{username} tried to connect again.")      # Check if the username is already in use
             client_socket.send("ERROR: Username already in use.".encode())
             client_socket.close()  # Ensure the socket is closed
             return    # Exit the function   

@@ -46,6 +46,8 @@ def receive_messages():
                 log_message(f"File List:\n{file_list}")  # Log the file list
 
             elif message.startswith("ERROR:"):      # Check if the message is an error message
+                if message == "ERROR: Username already in use.":
+                    client_socket.close()
                 log_message(message)
 
             else:   # If the message is a regular text message
@@ -113,6 +115,7 @@ def connect_to_server():    # Function to connect to the server
         log_message("Connected to the server.")   # Log the successful connection
     except Exception as e:
         messagebox.showerror("Error", f"Unable to connect: {e}")
+        client_socket.close()
 
 def log_message(message):   # Function to log messages in the chat area
     chat_area.insert(tk.END, f"{message}\n")    # Insert the message at the end of the chat area
