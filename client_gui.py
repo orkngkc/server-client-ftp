@@ -30,7 +30,6 @@ def receive_messages():
 
             elif message.startswith("ERROR:"):      # Check if the message is an error message
                 log_message(message)
-                client_socket.close()
 
             else:   # If the message is a regular text message
                 log_message(f"From server: {message}")  # Log the message
